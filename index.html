@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Khelar Khata - Live Cricket Broadcast</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&family=Outfit:wght@500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <!-- HLS.js for direct M3U8 video streams -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <!-- Firebase App & Database SDK (v10 Compat for static GitHub Pages) -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Top Header -->
+    <header class="broadcast-header">
+      <div class="brand">
+        <span class="brand-badge">KHELAR KHATA</span>
+        <span class="live-pill" id="livePill">
+          <span class="pulse-dot"></span> LIVE
+        </span>
+      </div>
+      <div class="header-match-info" id="headerMatchTitle">Connecting...</div>
+      <div class="header-actions">
+        <button class="btn-code" id="btnChangeCode" title="Change Match Code">
+          <span class="code-label">CODE:</span> <span id="headerMatchCode">------</span>
+        </button>
+        <button class="btn-icon" id="btnFullscreen" title="Fullscreen">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+            <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Stage (16:9 Broadcast Stage) -->
+    <main class="stage-container" id="stageContainer">
+      <div class="stage-viewport" id="stageViewport">
+        
+        <!-- Video Layer -->
+        <div class="video-layer" id="videoLayer">
+          <!-- Fallback Graphic Stadium when no live video URL is streaming -->
+          <div class="stadium-backdrop" id="stadiumBackdrop">
+            <div class="stadium-ambient-lights"></div>
+            <div class="stadium-pitch">
+              <div class="crease-line"></div>
+              <div class="stumps">
+                <span></span><span></span><span></span>
+              </div>
+            </div>
+            <div class="stadium-overlay-text">
+              <div class="match-vs" id="backdropMatchVs">LIVE CRICKET MATCH</div>
+              <div class="status-sub" id="backdropSubText">Live Ball-by-Ball Broadcast</div>
+            </div>
+          </div>
+
+          <!-- YouTube Player Container -->
+          <div class="video-container" id="youtubeContainer" style="display: none;">
+            <iframe id="youtubeIframe" src="" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+          </div>
+
+          <!-- HLS / Direct Video Player -->
+          <div class="video-container" id="hlsContainer" style="display: none;">
+            <video id="hlsVideo" playsinline controls muted autoplay></video>
+          </div>
+        </div>
+
+        <!-- Watermark / Branding -->
+        <div class="broadcast-watermark">
+          <span class="watermark-logo">🏏 KHELAR KHATA</span>
+          <span class="watermark-live">HD LIVE</span>
+        </div>
+
+        <!-- Celebration Banner Layer (FOUR, SIX, WICKET) -->
+        <div class="celebration-layer" id="celebrationLayer">
+          <div class="celebration-banner" id="celebrationBanner">
+            <div class="celebration-glow"></div>
+            <div class="celebration-text" id="celebrationText">MAXIMUM 6</div>
+          </div>
+        </div>
+
+        <!-- Dynamic Animated Graphic Overlays (Dispatcher) -->
+        <div class="overlay-dispatcher-layer" id="overlayDispatcherLayer">
+          
+          <!-- Card: Match Summary -->
+          <div class="overlay-card card-summary" id="cardMatchSummary" style="display: none;">
+            <div class="card-header">
+              <span class="card-tag">MATCH SUMMARY</span>
+              <span class="card-title" id="summaryHeaderTitle">1ST INNINGS COMPLETED</span>
+            </div>
+            <div class="summary-body">
+              <div class="summary-team-block">
+                <div class="team-name" id="sumTeamAName">TEAM A</div>
+                <div class="team-score" id="sumTeamAScore">0/0 <span class="overs-muted">(0.0 Ov)</span></div>
+                <div class="team-top-stats" id="sumTeamAStats">Top: -</div>
+              </div>
+              <div class="summary-vs-divider">VS</div>
+              <div class="summary-team-block">
+                <div class="team-name" id="sumTeamBName">TEAM B</div>
+                <div class="team-score" id="sumTeamBScore">0/0 <span class="overs-muted">(0.0 Ov)</span></div>
+                <div class="team-top-stats" id="sumTeamBStats">Top: -</div>
+              </div>
+            </div>
+            <div class="summary-footer" id="summaryFooterStatus">Result Pending</div>
+          </div>
+
+          <!-- Card: Batter Overview -->
+          <div class="overlay-card card-batter" id="cardBatterOverview" style="display: none;">
+            <div class="card-header">
+              <span class="card-tag gold-tag">BATSMAN OVERVIEW</span>
+              <span class="card-title" id="batterCardName">Player Name</span>
+            </div>
+            <div class="stat-grid-row">
+              <div class="stat-col"><span class="stat-val" id="batterCardRuns">0</span><span class="stat-lbl">RUNS</span></div>
+              <div class="stat-col"><span class="stat-val" id="batterCardBalls">0</span><span class="stat-lbl">BALLS</span></div>
+              <div class="stat-col"><span class="stat-val" id="batterCardFours">0</span><span class="stat-lbl">4s</span></div>
+              <div class="stat-col"><span class="stat-val" id="batterCardSixes">0</span><span class="stat-lbl">6s</span></div>
+              <div class="stat-col"><span class="stat-val" id="batterCardSR">0.00</span><span class="stat-lbl">S/R</span></div>
+            </div>
+          </div>
+
+          <!-- Card: Out Batter -->
+          <div class="overlay-card card-wicket" id="cardOutBatter" style="display: none;">
+            <div class="card-header red-header">
+              <span class="card-tag red-tag">WICKET</span>
+              <span class="card-title" id="outBatterName">Player Name</span>
+            </div>
+            <div class="out-info-box">
+              <div class="out-desc" id="outBatterDesc">b Bowler</div>
+              <div class="out-stats" id="outBatterStats"><strong>0</strong> runs off <strong>0</strong> balls</div>
+            </div>
+          </div>
+
+          <!-- Card: Target Banner -->
+          <div class="overlay-card card-target" id="cardTargetBanner" style="display: none;">
+            <div class="target-title">TARGET</div>
+            <div class="target-runs" id="targetCardRuns">150</div>
+            <div class="target-details" id="targetCardDetails">To Win from 20 Overs • RRR: 7.50</div>
+          </div>
+
+          <!-- Card: Current / New Bowler -->
+          <div class="overlay-card card-bowler" id="cardBowlerOverview" style="display: none;">
+            <div class="card-header blue-header">
+              <span class="card-tag blue-tag">BOWLER</span>
+              <span class="card-title" id="bowlerCardName">Bowler Name</span>
+            </div>
+            <div class="stat-grid-row">
+              <div class="stat-col"><span class="stat-val" id="bowlerCardOvers">0.0</span><span class="stat-lbl">OVERS</span></div>
+              <div class="stat-col"><span class="stat-val" id="bowlerCardMaidens">0</span><span class="stat-lbl">MAIDEN</span></div>
+              <div class="stat-col"><span class="stat-val" id="bowlerCardRuns">0</span><span class="stat-lbl">RUNS</span></div>
+              <div class="stat-col"><span class="stat-val" id="bowlerCardWickets">0</span><span class="stat-lbl">WKTS</span></div>
+              <div class="stat-col"><span class="stat-val" id="bowlerCardEcon">0.00</span><span class="stat-lbl">ECON</span></div>
+            </div>
+          </div>
+
+          <!-- Card: Custom Text / Ad Banner -->
+          <div class="overlay-card card-text-banner" id="cardTextBanner" style="display: none;">
+            <div class="banner-body" id="textBannerContent">Custom Announcement</div>
+          </div>
+
+        </div>
+
+        <!-- TV Broadcast Lower-Third Score Bar -->
+        <div class="tv-scorebar" id="tvScoreBar">
+          <!-- Batting Team & Big Score -->
+          <div class="scorebar-team-cluster">
+            <div class="team-badge" id="sbTeamBadge">BAT</div>
+            <div class="score-display">
+              <span class="main-score" id="sbScore">0/0</span>
+              <span class="overs-display" id="sbOvers">0.0<span class="max-overs" id="sbMaxOvers">/20</span></span>
+            </div>
+          </div>
+
+          <!-- Batters Section -->
+          <div class="scorebar-batters">
+            <div class="batter-entry" id="sbStrikerEntry">
+              <span class="batter-indicator">▶</span>
+              <span class="player-name" id="sbStrikerName">Striker</span>
+              <span class="player-score" id="sbStrikerScore">0 <span class="balls-sub">(0)</span></span>
+            </div>
+            <div class="batter-entry" id="sbNonStrikerEntry">
+              <span class="batter-indicator muted">·</span>
+              <span class="player-name" id="sbNonStrikerName">Non-Striker</span>
+              <span class="player-score" id="sbNonStrikerScore">0 <span class="balls-sub">(0)</span></span>
+            </div>
+          </div>
+
+          <!-- Active Bowler Section -->
+          <div class="scorebar-bowler">
+            <div class="bowler-top">
+              <span class="bowler-icon">⚾</span>
+              <span class="player-name" id="sbBowlerName">Bowler</span>
+            </div>
+            <div class="bowler-figures" id="sbBowlerFigures">0-0 <span class="balls-sub">(0.0)</span></div>
+          </div>
+
+          <!-- Ball by Ball Chips of Current Over -->
+          <div class="scorebar-balls" id="sbThisOverChips">
+            <span class="ball-chip">·</span>
+          </div>
+
+          <!-- Match Equations (CRR, Target, RRR) -->
+          <div class="scorebar-rates">
+            <div class="rate-badge crr-badge">CRR <span id="sbCrr">0.00</span></div>
+            <div class="rate-badge rrr-badge" id="sbRrrBox" style="display: none;">RRR <span id="sbRrr">-</span></div>
+            <div class="target-sub" id="sbTargetNotice" style="display: none;">Need <span id="sbRunsNeeded">0</span> in <span id="sbBallsLeft">0</span>b</div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <!-- Bottom Controls & Share Section -->
+    <footer class="broadcast-footer">
+      <div class="footer-status" id="connectionStatus">
+        <span class="status-indicator"></span>
+        <span id="connectionStatusText">Ready</span>
+      </div>
+      <div class="footer-links">
+        <button class="footer-btn" id="btnShareMatch">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92c0-1.61-1.31-2.92-2.92-2.92z"/>
+          </svg>
+          Share Stream Link
+        </button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Modal: Enter Match Code -->
+  <div class="modal-backdrop" id="codeModal" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-title">Enter Live Match Code</div>
+      <p class="modal-desc">Enter the 6-digit match code broadcasted from the Khelar Khata scorer app:</p>
+      <input type="text" id="inputMatchCode" class="modal-input" placeholder="e.g. 123456" maxlength="10" autocomplete="off">
+      <div class="modal-actions">
+        <button class="modal-btn-cancel" id="btnModalCancel">Cancel</button>
+        <button class="modal-btn-primary" id="btnModalConnect">Connect Live</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
